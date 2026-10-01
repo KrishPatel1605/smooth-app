@@ -435,8 +435,9 @@ class _NutrientUnitCellState extends State<_NutrientUnitCell> {
                       return;
                     }
                     setState(
-                      () => widget.nutritionContainer.setNextWeightUnit(
-                        widget.orderedNutrient,
+                      () => widget.nutritionContainer.setNutrientUnit(
+                        NutritionContainerHelper.getNutrient(widget.orderedNutrient)!,
+                        value,
                       ),
                     );
                   }

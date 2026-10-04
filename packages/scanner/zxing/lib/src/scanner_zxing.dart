@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_zxing/flutter_zxing.dart';
 import 'package:scanner_shared/scanner_shared.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-// TODO(monsieurtanuki): obviously needs to be implemented.
 /// Scanner implementation using ZXing
 class ScannerZXing extends Scanner {
   const ScannerZXing();
@@ -87,6 +87,30 @@ class _SmoothBarcodeScannerZXingState
     onVisibilityChanged: (final VisibilityInfo info) {},
     child: Stack(
       children: <Widget>[
+        Positioned.fill(
+          child: ReaderWidget(
+            onScan: _onScan,
+            // We draw our own visor
+            showScannerOverlay: false,
+            showGallery: false,
+            showToggleCamera: widget.hasMoreThanOneCamera,
+            showFlashlight: true,
+            // Barcodes can be in any direction (eg: standing vertically):
+            // [tryRotate] makes ZXing test the 4 orientations and
+            // [tryHarder] enables a slower but more accurate algorithm.
+            tryRotate: true,
+            tryHarder: true,
+            // Some labels are printed white on black
+            tryInverted: true,
+            // The default delay (1s) is far too long to catch a barcode
+            // while the phone is moving.
+            scanDelay: const Duration(milliseconds: 150),
+            scanDelaySuccess: const Duration(milliseconds: 1000),
+            // Analyze a larger area than the default (0.5), so that a
+            // barcode standing vertically is not cropped.
+            cropPercent: 0.8,
+          ),
+        ),
         Center(
           child: SmoothBarcodeScannerVisor(
             icon: widget.barcodeScannerIcon,
@@ -96,4 +120,14 @@ class _SmoothBarcodeScannerZXingState
       ],
     ),
   );
+
+  Future<void> _onScan(final Code code) async {
+    final String? text = code.text;
+    // Ignore partial / invalid decodings
+    if (!code.isValid || text == null || text.isEmpty) {
+      return;
+    }
+    // The upper layer validates the check digit (see GtinValidator)
+    await widget.onScan(text);
+  }
 }

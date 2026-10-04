@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:openfoodfacts/openfoodfacts.dart';
+import 'package:scanner_shared/scanner_shared.dart';
 import 'package:smooth_app/data_models/fetched_product.dart';
 import 'package:smooth_app/data_models/product_list.dart';
 import 'package:smooth_app/database/dao_product.dart';
@@ -117,6 +118,11 @@ class ContinuousScanModel with ChangeNotifier {
 
     code = _fixBarcodeIfNecessary(code);
     if (code.length < 4) {
+      return false;
+    }
+
+    // Filter out "ghost" scans (misreads happening when the phone moves).
+    if (!_isScanReliable(code)) {
       return false;
     }
 
@@ -303,6 +309,24 @@ class ContinuousScanModel with ChangeNotifier {
   Future<void> refresh() async {
     await _refresh();
     notifyListeners();
+  }
+
+  final BarcodeConfirmer _confirmer = BarcodeConfirmer();
+
+  /// Whether a decoded [code] can be trusted.
+  /// - GTINs (EAN-8/UPC-A/EAN-13/GTIN-14) must have a valid check digit:
+  ///   a misread is rejected immediately.
+  /// - Other codes (short, alphanumeric…) have no checksum, so they must be
+  ///   detected twice in a short period.
+  bool _isScanReliable(final String code) {
+    if (GtinValidator.looksLikeGtin(code)) {
+      return GtinValidator.hasValidGtinChecksum(code);
+    }
+    // Already known codes don't need to be confirmed again
+    if (_latestScannedBarcode == code || _barcodes.contains(code)) {
+      return true;
+    }
+    return _confirmer.confirm(code);
   }
 
   /// Sometimes the scanner may fail, this is a simple fix for now

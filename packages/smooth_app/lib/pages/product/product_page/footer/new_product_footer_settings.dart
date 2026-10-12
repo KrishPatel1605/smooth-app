@@ -14,7 +14,6 @@ import 'package:smooth_app/pages/product/product_page/footer/new_product_footer.
 import 'package:smooth_app/resources/app_icons.dart' as icons;
 import 'package:smooth_app/themes/smooth_theme_colors.dart';
 import 'package:smooth_app/themes/theme_provider.dart';
-import 'package:smooth_app/widgets/smooth_list_diff.dart';
 
 /// A Settings button allowing to reorder and hide the action bar items
 class ProductFooterSettingsButton extends StatelessWidget {
@@ -122,24 +121,44 @@ class _ProductActionBarModalEditorState
                 as _ProductActionBarChangedState)
             .entries;
 
-    return SmoothAnimatedList<_ProductActionBarEntry>(
-      data: entries,
-      itemBuilder:
-          (BuildContext context, _ProductActionBarEntry entry, int index) {
-            return KeyedSubtree(
-              key: ValueKey<ProductFooterActionBar>(entry.action),
-              child: _ProductActionBarModalItemEditor(
-                entry: entry,
-                position: index,
-                canMoveUp: entry.visible && index > 0,
-                canMoveDown:
-                    entry.visible &&
-                    (index < entries.length - 1 && entries[index + 1].visible),
-              ),
-            );
-          },
-      separatorSize: SEPARATOR_SIZE,
-      padding: PADDING,
+    return ReorderableListView.builder(
+      padding: PADDING.resolve(Directionality.of(context)),
+      buildDefaultDragHandles: false,
+      itemCount: entries.length,
+      onReorder: (int oldIndex, int newIndex) {
+        if (!entries[oldIndex].visible) {
+          return;
+        }
+
+        if (newIndex > oldIndex) {
+          newIndex--;
+        }
+
+        if (oldIndex == newIndex) {
+          return;
+        }
+
+        context.read<_ProductActionBarProvider>().reorderPosition(
+          oldIndex,
+          newIndex,
+        );
+
+        SmoothHapticFeedback.lightNotification();
+      },
+      itemBuilder: (BuildContext context, int index) {
+        final _ProductActionBarEntry entry = entries[index];
+
+        return Padding(
+          key: ValueKey<ProductFooterActionBar>(entry.action),
+          padding: EdgeInsetsDirectional.only(
+            bottom: index < entries.length - 1 ? SEPARATOR_SIZE : 0.0,
+          ),
+          child: _ProductActionBarModalItemEditor(
+            entry: entry,
+            position: index,
+          ),
+        );
+      },
     );
   }
 }
@@ -147,14 +166,10 @@ class _ProductActionBarModalEditorState
 class _ProductActionBarModalItemEditor extends StatefulWidget {
   const _ProductActionBarModalItemEditor({
     required this.entry,
-    required this.canMoveUp,
-    required this.canMoveDown,
     required this.position,
   });
 
   final _ProductActionBarEntry entry;
-  final bool canMoveUp;
-  final bool canMoveDown;
   final int position;
 
   @override
@@ -243,17 +258,21 @@ class _ProductActionBarModalItemEditorState
             ),
             child: Row(
               children: <Widget>[
-                _ProductActionBarModalItemActionVisibility(
-                  visible: widget.entry.visible,
-                  onTap: () {
-                    context.read<_ProductActionBarProvider>().changeVisibility(
-                      widget.entry,
-                    );
-
-                    SmoothHapticFeedback.lightNotification();
-                  },
+                ReorderableDragStartListener(
+                  index: widget.position,
+                  enabled: widget.entry.visible,
+                  child: SizedBox(
+                    width: MINIMUM_TOUCH_SIZE,
+                    height: 34.0,
+                    child: widget.entry.visible
+                        ? Icon(
+                            Icons.menu,
+                            color: extension.primaryDark,
+                          )
+                        : null,
+                  ),
                 ),
-                const SizedBox(width: VERY_LARGE_SPACE * 2),
+                const SizedBox(width: MEDIUM_SPACE),
                 icons.AppIconTheme(
                   size: 22.0,
                   color: extension.primaryDark,
@@ -278,26 +297,11 @@ class _ProductActionBarModalItemEditorState
                   ),
                 ),
                 const SizedBox(width: MEDIUM_SPACE),
-                _ProductActionBarModalItemActionMoveUp(
+                _ProductActionBarModalItemActionVisibility(
                   visible: widget.entry.visible,
-                  enabled: widget.canMoveUp,
                   onTap: () {
-                    context.read<_ProductActionBarProvider>().reorderPosition(
-                      widget.position,
-                      widget.position - 1,
-                    );
-
-                    SmoothHapticFeedback.lightNotification();
-                  },
-                ),
-                const SizedBox(width: SMALL_SPACE),
-                _ProductActionBarModalItemActionMoveDown(
-                  visible: widget.entry.visible,
-                  enabled: widget.canMoveDown,
-                  onTap: () {
-                    context.read<_ProductActionBarProvider>().reorderPosition(
-                      widget.position,
-                      widget.position + 1,
+                    context.read<_ProductActionBarProvider>().changeVisibility(
+                      widget.entry,
                     );
 
                     SmoothHapticFeedback.lightNotification();
@@ -360,67 +364,6 @@ class _ProductActionBarModalItemEditorState
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-}
-
-class _ProductActionBarModalItemActionMoveUp extends StatelessWidget {
-  const _ProductActionBarModalItemActionMoveUp({
-    required this.visible,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final bool visible;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final SmoothColorsThemeExtension extension = Theme.of(
-      context,
-    ).extension<SmoothColorsThemeExtension>()!;
-
-    return _ProductActionBarModalItemAction(
-      icon: const icons.Chevron.up(size: 14.0),
-      semanticsLabel: AppLocalizations.of(
-        context,
-      ).product_page_action_bar_item_move_up,
-      enabled: enabled,
-      visible: visible,
-      disabledColor: visible ? extension.primaryLight : extension.primaryMedium,
-      onTap: enabled ? onTap : () {},
-    );
-  }
-}
-
-class _ProductActionBarModalItemActionMoveDown extends StatelessWidget {
-  const _ProductActionBarModalItemActionMoveDown({
-    required this.visible,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final bool visible;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final SmoothColorsThemeExtension extension = Theme.of(
-      context,
-    ).extension<SmoothColorsThemeExtension>()!;
-
-    return _ProductActionBarModalItemAction(
-      icon: const icons.Chevron.down(size: 14.0),
-      padding: const EdgeInsetsDirectional.only(top: 1.0),
-      semanticsLabel: AppLocalizations.of(
-        context,
-      ).product_page_action_bar_item_move_down,
-      enabled: enabled,
-      visible: visible,
-      disabledColor: visible ? extension.primaryLight : extension.primaryMedium,
-      onTap: enabled ? onTap : () {},
-    );
   }
 }
 

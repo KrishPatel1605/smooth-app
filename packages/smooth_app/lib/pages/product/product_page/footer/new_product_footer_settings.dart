@@ -265,10 +265,7 @@ class _ProductActionBarModalItemEditorState
                     width: MINIMUM_TOUCH_SIZE,
                     height: 34.0,
                     child: widget.entry.visible
-                        ? Icon(
-                            Icons.menu,
-                            color: extension.primaryDark,
-                          )
+                        ? Icon(Icons.menu, color: extension.primaryDark)
                         : null,
                   ),
                 ),
